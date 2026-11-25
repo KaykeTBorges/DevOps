@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Compute Server — Plataforma de Workloads de IA</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px; }
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge { padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border); background: #1e293b; color: var(--muted); }
+    .badge-ok { border-color: #065f46; color: #34d399; }
+    .badge-auth { border-color: #1e40af; color: #60a5fa; background: #172554; }
+
+    .grid { display: grid; grid-template-columns: 390px 1fr; gap: 24px; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 0.825rem; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"], input[type="email"], input[type="number"], select {
+      width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.875rem; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 8px; padding: 24px 16px; text-align: center;
+      cursor: pointer; transition: all 0.2s ease; background: #162032;
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--primary); background: #1a2744; }
+    .dropzone input { display: none; }
+    .dropzone-text { font-size: 0.875rem; color: var(--muted); }
+    .file-name { font-weight: 600; color: var(--text); margin-top: 6px; }
+
+    button {
+      padding: 9px 16px; border-radius: 6px; font-weight: 600; font-size: 0.875rem; cursor: pointer;
+      border: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; width: 100%; margin-top: 8px; }
+    .btn-secondary { background: #334155; color: #f8fafc; }
+    .btn-cancel { background: #dc2626; color: #fff; padding: 4px 8px; font-size: 0.75rem; }
+    .btn-danger { background: #ef4444; color: #fff; padding: 4px 8px; font-size: 0.75rem; }
+    .btn-small { padding: 4px 10px; font-size: 0.75rem; }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
+    th { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #24334d; }
+
+    .status-badge {
+      display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    }
+    .status-queued { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f655; }
+    .status-running { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b55; }
+    .status-completed { background: #10b98122; color: #34d399; border: 1px solid #10b98155; }
+    .status-failed { background: #ef444422; color: #f87171; border: 1px solid #ef444455; }
+    .status-timeout { background: #f9731622; color: #fb923c; border: 1px solid #f9731655; }
+    .status-cancelled { background: #64748b22; color: #94a3b8; border: 1px solid #64748b55; }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7);
+      display: none; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+      width: 90%; max-width: 800px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .log-box {
+      background: #090d16; color: #a7f3d0; font-family: var(--mono); font-size: 0.8rem;
+      padding: 16px; border-radius: 8px; border: 1px solid #1e293b; white-space: pre-wrap; word-break: break-all;
+      max-height: 450px; overflow-y: auto; line-height: 1.4;
+    }
+    .close-btn { background: none; border: none; color: var(--muted); font-size: 1.25rem; cursor: pointer; }
+    .empty-state { text-align: center; color: var(--muted); padding: 40px 0; }
+
+    .auth-banner {
+      background: #1e3a5f; border: 1px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>⚡ AI Compute Server</h1>
+        <p style="font-size: 0.85rem; color: var(--muted); margin-top: 4px;">Execução local de workloads de IA com isolamento estrito e autenticação institucional</p>
+      </div>
+      <div class="badges">
+        <span class="badge badge-ok">● Fila FIFO Resiliente</span>
+        <span class="badge badge-ok">● Docker Sandbox</span>
+        <span id="userBadge" class="badge">Não autenticado</span>
+        <button id="authBtn" class="btn-secondary btn-small" onclick="handleAuthAction()">Entrar</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Coluna da Esquerda: Upload ou Login -->
+      <div class="card">
+        <div class="card-title">
+          <span>Novo Job de IA</span>
+          <span style="font-size: 0.75rem; color: #60a5fa;" id="authStatusText">Requer @academico.ufpb.br</span>
+        </div>
+
+        <!-- Bloco de Login OTP Institucional (Pilar 1) -->
+        <div id="loginSection" style="display: none;" class="auth-banner">
+          <h4 style="font-size: 0.9rem; margin-bottom: 8px; color: #93c5fd;">🔐 Autenticação Institucional</h4>
+          <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 10px;">Informe seu e-mail institucional para receber o código OTP temporário.</p>
+          <div class="form-group">
+            <label>E-mail (@academico.ufpb.br)</label>
+            <input type="email" id="loginEmail" placeholder="ex: seu.nome@academico.ufpb.br">
+          </div>
+          <button type="button" class="btn-secondary btn-small" style="width: 100%; margin-bottom: 8px;" onclick="requestOtp()" id="btnRequestOtp">Enviar Código OTP</button>
+
+          <div id="otpInputGroup" style="display: none; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px;">
+            <label>Código de 6 Dígitos</label>
+            <input type="text" id="loginOtp" maxlength="6" placeholder="000000" style="letter-spacing: 4px; font-weight: bold; text-align: center;">
+            <button type="button" class="btn-primary btn-small" style="margin-top: 8px;" onclick="verifyOtp()" id="btnVerifyOtp">Confirmar e Entrar</button>
+          </div>
+        </div>
+
+        <!-- Formulário de Upload do Job -->
+        <form id="uploadForm">
+          <div class="form-group">
+            <label>Usuário Ativo</label>
+            <input type="text" id="activeUserDisplay" readonly style="background: #1e293b; color: #93c5fd; font-weight: 600;" value="Não autenticado (faça login acima)">
+          </div>
+
+          <div class="form-group">
+            <label>Projeto (.zip com código do modelo)</label>
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+              <div class="dropzone-text" id="dropzoneText">Arraste o arquivo .zip ou clique aqui</div>
+              <div class="file-name" id="fileName"></div>
+              <input type="file" id="fileInput" name="file" accept=".zip" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Entrypoint (script a executar)</label>
+            <input type="text" id="entrypoint" name="entrypoint" value="main.py" placeholder="ex: main.py ou train.py">
+          </div>
+
+          <div class="form-group">
+            <label>Ambiente de Execução (Pilar 2: Allowlist)</label>
+            <select id="image_id" name="image_id" required>
+              <option value="" disabled selected>Carregando catálogo...</option>
+            </select>
+            <div id="imageDesc" style="font-size: 0.75rem; color: var(--muted); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Tempo Máximo de Execução (segundos) <span id="timeoutLimits" style="font-size:0.7rem; color: var(--muted);"></span></label>
+            <input type="number" id="timeout_seconds" name="timeout_seconds" value="300" min="60">
+          </div>
+
+          <div style="background:#162032; border:1px solid var(--border); border-radius:6px; padding:8px 12px; margin-bottom:14px;">
+            <span style="font-size:0.75rem; color:#94a3b8;">⚙ Recursos de hardware (CPU, RAM, GPU) são gerenciados com alocação exclusiva pelo administrador do servidor.</span>
+          </div>
+
+          <button type="submit" class="btn-primary" id="btnSubmit">Criar e Enfileirar Job</button>
+        </form>
+      </div>
+
+      <!-- Coluna da Direita: Fila de Jobs e Status -->
+      <div class="card">
+        <div class="card-title">
+          <span>Fila de Execução e Histórico</span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-size: 0.75rem; color: #34d399; font-weight: 600;">⚡ Execução Automática FIFO</span>
+            <button class="btn-secondary btn-small" onclick="fetchJobs()">↻ Atualizar</button>
+          </div>
+        </div>
+        <div id="metricsSummary" style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin-bottom:14px;">
+          <div class="badge">Jobs ativos: <strong id="metricActiveJobs">-</strong></div>
+          <div class="badge">Carga: <strong id="metricLoad">-</strong></div>
+          <div class="badge">RAM livre: <strong id="metricMemory">-</strong></div>
+          <div class="badge">Disco livre: <strong id="metricDisk">-</strong></div>
+        </div>
+
+        <!-- Filtro de Isolamento de Usuários -->
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; background: #162032; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; color: var(--muted); font-weight: 500;">Filtrar Jobs:</span>
+          <input type="text" id="filterUser" placeholder="Todos os usuários" style="width: 180px; padding: 4px 8px; font-size: 0.8rem;" oninput="fetchJobs()">
+          <button type="button" class="btn-secondary btn-small" onclick="filterMyJobs()">Apenas Meus Jobs</button>
+          <button type="button" class="btn-secondary btn-small" onclick="filterAllJobs()">Ver Todos</button>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Autor</th>
+                <th>Status</th>
+                <th>Entrypoint</th>
+                <th>Criado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="jobsTableBody">
+              <tr>
+                <td colspan="6" class="empty-state">Carregando lista de jobs...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Logs e Detalhes -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="modalTitle" style="font-weight: 600;">Logs do Job</span>
+        <button class="close-btn" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="log-box" id="logContent">Carregando logs...</div>
+        <div id="outputSection" style="margin-top: 16px; display: none;">
+          <h4 style="font-size: 0.9rem; margin-bottom: 8px;">Arquivos de Saída (Output):</h4>
+          <ul id="outputList" style="font-size: 0.85rem; padding-left: 20px;"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const fileName = document.getElementById('fileName');
+    const dropzoneText = document.getElementById('dropzoneText');
+    const uploadForm = document.getElementById('uploadForm');
+    const jobsTableBody = document.getElementById('jobsTableBody');
+
+    let currentUser = null;
+    let catalogImages = [];
+
+    // === PILAR 1: Autenticação Passwordless ===
+    function getStoredToken() {
+      return localStorage.getItem('ai_compute_token');
+    }
+
+    async function checkAuth() {
+      const token = getStoredToken();
+      if (!token) {
+        setUnauthenticatedUI();
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentUser = data.user;
+          setAuthenticatedUI(currentUser.email);
+        } else {
+          localStorage.removeItem('ai_compute_token');
+          setUnauthenticatedUI();
+        }
+      } catch (err) {
+        setUnauthenticatedUI();
+      }
+    }
+
+    function setAuthenticatedUI(email) {
+      document.getElementById('userBadge').textContent = `👤 ${email}`;
+      document.getElementById('userBadge').className = 'badge badge-auth';
+      document.getElementById('authBtn').textContent = 'Sair';
+      document.getElementById('activeUserDisplay').value = email;
+      document.getElementById('authStatusText').textContent = 'Autenticado';
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('btnSubmit').disabled = false;
+    }
+
+    function setUnauthenticatedUI() {
+      currentUser = null;
+      document.getElementById('userBadge').textContent = 'Não autenticado';
+      document.getElementById('userBadge').className = 'badge';
+      document.getElementById('authBtn').textContent = 'Entrar';
+      document.getElementById('activeUserDisplay').value = 'Faça login com seu e-mail institucional';
+      document.getElementById('authStatusText').textContent = 'Requer login (@academico.ufpb.br)';
+      document.getElementById('loginSection').style.display = 'block';
+      document.getElementById('btnSubmit').disabled = true;
+    }
+
+    function handleAuthAction() {
+      if (currentUser) {
+        logout();
+      } else {
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('loginEmail').focus();
+      }
+    }
+
+    async function requestOtp() {
+      const email = document.getElementById('loginEmail').value.trim();
+      if (!email) {
+        alert('Por favor, informe seu e-mail institucional.');
+        return;
+      }
+      const btn = document.getElementById('btnRequestOtp');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      try {
+        const res = await fetch('/api/auth/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jsonStringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Erro: ' + (data.error || 'Falha ao solicitar código'));
+        } else {
+          document.getElementById('otpInputGroup').style.display = 'block';
+          if (data.dev_otp) {
+            document.getElementById('loginOtp').value = data.dev_otp;
+            alert(`[MODO DEV] Código OTP gerado: ${data.dev_otp}`);
+          } else {
+            alert(data.message || 'Código OTP enviado ao seu e-mail.');
+          }
+        }
+      } catch (err) {
+        alert('Erro ao conectar ao servidor: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Reenviar Código OTP';
+      }
+    }
+
+    async function verifyOtp() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const otp = document.getElementById('loginOtp').value.trim();
+      if (!otp || otp.length !== 6) {
+        alert('Informe o código OTP de 6 dígitos.');
+        return;
+      }
+
+      const btn = document.getElementById('btnVerifyOtp');
+      btn.disabled = true;
+      btn.textContent = 'Validando...';
+
+      try {
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jsonStringify({ email, otp })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Erro: ' + (data.error || 'Código inválido'));
+        } else {
+          localStorage.setItem('ai_compute_token', data.token);
+          await checkAuth();
+          fetchJobs();
+        }
+      } catch (err) {
+        alert('Erro de conexão: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar e Entrar';
+      }
+    }
+
+    async function logout() {
+      const token = getStoredToken();
+      if (token) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        } catch (_) {}
+      }
+      localStorage.removeItem('ai_compute_token');
+      setUnauthenticatedUI();
+    }
+
+    function jsonStringify(obj) { return JSON.stringify(obj); }
+
+    // === PILAR 2: Catálogo de imagens ===
+    const imageSelect = document.getElementById('image_id');
+    const imageDesc = document.getElementById('imageDesc');
+
+    async function loadCatalog() {
+      try {
+        const res = await fetch('/api/catalog/images');
+        const data = await res.json();
+        catalogImages = data.images || [];
+        const config = data.admin_config || {};
+
+        imageSelect.innerHTML = '';
+        if (catalogImages.length === 0) {
+          imageSelect.innerHTML = '<option value="" disabled selected>Nenhum ambiente disponível</option>';
+        } else {
+          catalogImages.forEach(img => {
+            const opt = document.createElement('option');
+            opt.value = img.id;
+            opt.textContent = img.display_name + (img.gpu_required ? ' 🎮 GPU' : '');
+            imageSelect.appendChild(opt);
+          });
+          updateImageDesc();
+        }
+
+        const timeoutInput = document.getElementById('timeout_seconds');
+        const limitsSpan = document.getElementById('timeoutLimits');
+        if (config.min_timeout && config.hard_cap_timeout) {
+          timeoutInput.min = config.min_timeout;
+          timeoutInput.max = config.hard_cap_timeout;
+          const maxHoras = (config.hard_cap_timeout / 3600).toFixed(1);
+          limitsSpan.textContent = `(mín: ${config.min_timeout}s / máx: ${config.hard_cap_timeout}s = ${maxHoras}h)`;
+        }
+      } catch (err) {
+        imageSelect.innerHTML = '<option value="" disabled selected>Erro ao carregar catálogo</option>';
+      }
+    }
+
+    function updateImageDesc() {
+      const selected = catalogImages.find(img => img.id === imageSelect.value);
+      imageDesc.textContent = selected ? selected.description : '';
+    }
+    imageSelect.addEventListener('change', updateImageDesc);
+
+    // Drag and drop do arquivo ZIP
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        fileName.textContent = fileInput.files[0].name;
+        dropzoneText.textContent = 'Arquivo selecionado:';
+      }
+    });
+
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        fileName.textContent = e.dataTransfer.files[0].name;
+        dropzoneText.textContent = 'Arquivo selecionado:';
+      }
+    });
+
+    // Envio do formulário com token de autenticação
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = getStoredToken();
+      if (!token) {
+        alert('Você precisa fazer login com seu e-mail institucional antes de enviar um job.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Validando e enviando...';
+
+      const formData = new FormData(uploadForm);
+      try {
+        const res = await fetch('/api/jobs/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Erro: ' + (data.error || 'Falha ao criar job'));
+        } else {
+          uploadForm.reset();
+          fileName.textContent = '';
+          dropzoneText.textContent = 'Arraste o arquivo .zip ou clique aqui';
+          fetchJobs();
+        }
+      } catch (err) {
+        alert('Erro ao conectar com a API: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Criar e Enfileirar Job';
+      }
+    });
+
+    function filterMyJobs() {
+      if (currentUser) {
+        document.getElementById('filterUser').value = currentUser.email;
+        fetchJobs();
+      } else {
+        alert('Faça login primeiro para ver apenas seus jobs.');
+      }
+    }
+
+    function filterAllJobs() {
+      document.getElementById('filterUser').value = '';
+      fetchJobs();
+    }
+
+    async function fetchJobs() {
+      try {
+        const filter = document.getElementById('filterUser')?.value?.trim();
+        const url = filter ? `/api/jobs?user_id=${encodeURIComponent(filter)}` : '/api/jobs';
+        const token = getStoredToken();
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token || ''}` } });
+        const data = await res.json();
+        renderJobs(data.jobs || []);
+      } catch (err) {
+        jobsTableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Erro ao carregar jobs: ${err.message}</td></tr>`;
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes) || bytes < 0) return '-';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+      }
+      return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+    }
+
+    async function fetchMetrics() {
+      const token = getStoredToken();
+      if (!token) return;
+      try {
+        const res = await fetch('/api/metrics', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const jobs = data.jobs || {};
+        const active = (jobs.running || 0) + (jobs.queued || 0) + (jobs.pending || 0);
+        const system = data.system || {};
+        const load = system.load_average?.[0];
+        document.getElementById('metricActiveJobs').textContent = active;
+        document.getElementById('metricLoad').textContent = Number.isFinite(load) ? load.toFixed(2) : '-';
+        document.getElementById('metricMemory').textContent = formatBytes(system.memory?.available_bytes);
+        document.getElementById('metricDisk').textContent = formatBytes(system.disk?.free_bytes);
+      } catch (err) {
+        document.getElementById('metricActiveJobs').textContent = '-';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[char]));
+    }
+
+    function renderJobs(jobs) {
+      if (!jobs || jobs.length === 0) {
+        jobsTableBody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum job registrado ainda. Envie um projeto ZIP ao lado!</td></tr>';
+        return;
+      }
+
+      jobsTableBody.innerHTML = jobs.map(j => {
+        const isRunningOrQueued = (j.status === 'running' || j.status === 'queued');
+        return `
+          <tr>
+            <td><code style="font-family: var(--mono); font-size: 0.8rem;">${escapeHtml(j.job_id)}</code></td>
+            <td><span style="font-weight: 600; color: #cbd5e1;">${escapeHtml(j.user_id || 'default_user')}</span></td>
+            <td><span class="status-badge status-${escapeHtml(j.status)}">${escapeHtml(j.status)}</span></td>
+            <td>${escapeHtml(j.entrypoint || 'main.py')}</td>
+            <td>${j.created_at ? j.created_at.replace('T', ' ').replace('Z', '') : '-'}</td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn-secondary btn-small" onclick="viewLogs('${j.job_id}')">Logs</button>
+                <button class="btn-secondary btn-small" onclick="viewOutputs('${j.job_id}')">Output</button>
+                ${isRunningOrQueued
+                  ? `<button class="btn-cancel btn-small" onclick="cancelJob('${j.job_id}')">⏹ Cancelar</button>`
+                  : `<button class="btn-danger btn-small" onclick="deleteJob('${j.job_id}')">✕</button>`
+                }
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Etapa C: Cancelamento forçado
+    async function cancelJob(jobId) {
+      if (!confirm(`Deseja realmente interromper o job ${jobId}? O container Docker será encerrado.`)) return;
+      const token = getStoredToken();
+      try {
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST', headers });
+        const data = await res.json();
+        if (res.ok) {
+          fetchJobs();
+        } else {
+          alert('Erro ao cancelar: ' + (data.error || 'Falha na requisição'));
+        }
+      } catch (err) {
+        alert('Erro ao conectar: ' + err.message);
+      }
+    }
+
+    async function deleteJob(jobId) {
+      if (!confirm(`Deseja remover o registro e os arquivos do job ${jobId}?`)) return;
+      const token = getStoredToken();
+      try {
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch(`/api/jobs/${jobId}`, { method: 'DELETE', headers });
+        if (res.ok) {
+          fetchJobs();
+        } else {
+          const data = await res.json();
+          alert('Erro ao excluir: ' + (data.error || 'Falha na requisição'));
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    async function viewLogs(jobId) {
+      document.getElementById('modalTitle').textContent = `Logs: ${jobId}`;
+      document.getElementById('outputSection').style.display = 'none';
+      document.getElementById('logContent').textContent = 'Carregando logs...';
+      document.getElementById('modal').classList.add('active');
+
+      try {
+        const res = await fetch(`/api/jobs/${jobId}/logs`, { headers: { 'Authorization': `Bearer ${getStoredToken() || ''}` } });
+        const data = await res.json();
+        document.getElementById('logContent').textContent = data.logs || '(Nenhum log gravado ainda)';
+      } catch (err) {
+        document.getElementById('logContent').textContent = 'Erro ao carregar logs: ' + err.message;
+      }
+    }
+
+    async function viewOutputs(jobId) {
+      document.getElementById('modalTitle').textContent = `Resultados: ${jobId}`;
+      document.getElementById('logContent').style.display = 'none';
+      const outputSection = document.getElementById('outputSection');
+      outputSection.style.display = 'block';
+      document.getElementById('modal').classList.add('active');
+
+      try {
+        const res = await fetch(`/api/jobs/${jobId}/output`, { headers: { 'Authorization': `Bearer ${getStoredToken() || ''}` } });
+        const data = await res.json();
+        const list = document.getElementById('outputList');
+        if (!data.files || data.files.length === 0) {
+          list.innerHTML = '<li>Nenhum arquivo gerado no diretório /job/output.</li>';
+        } else {
+          list.innerHTML = data.files.map(f => `
+            <li><button class="btn-secondary btn-small" onclick="downloadOutput('${escapeHtml(jobId)}', '${escapeHtml(f)}')">${escapeHtml(f)}</button></li>
+          `).join('');
+        }
+      } catch (err) {
+        document.getElementById('outputList').innerHTML = `<li>Erro: ${err.message}</li>`;
+      }
+    }
+
+    async function downloadOutput(jobId, filename) {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/output/${encodeURIComponent(filename)}`, {
+        headers: { 'Authorization': `Bearer ${getStoredToken() || ''}` }
+      });
+      if (!response.ok) {
+        alert('Não foi possível baixar o arquivo.');
+        return;
+      }
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename.split('/').pop();
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      document.getElementById('logContent').style.display = 'block';
+    }
+
+    // Inicialização
+    checkAuth();
+    loadCatalog();
+    fetchJobs();
+    fetchMetrics();
+    setInterval(() => { fetchJobs(); fetchMetrics(); }, 5000);
+  </script>
+</body>
+</html>
